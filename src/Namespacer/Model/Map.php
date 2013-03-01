@@ -36,7 +36,29 @@ class Map
     {
         $data = array();
         foreach ($this->mapData as $item) {
-
+            $data[$item['new_file']] = array(
+                'namespace' => $item['new_namespace'],
+                'class' => $item['new_class']
+            );
         }
+        return $data;
+    }
+
+    public function getNewFiles()
+    {
+        $data = array();
+        foreach ($this->mapData as $item) {
+            $data[] = $item['new_file'];
+        }
+        return $data;
+    }
+
+    public function getClassTransformations()
+    {
+        $data = array();
+        foreach ($this->mapData as $item) {
+            $data[$item['original_class']] = $item['new_namespace'] . '\\' . $item['new_class'];
+        }
+        return $data;
     }
 }

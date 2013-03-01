@@ -26,10 +26,28 @@ class Controller extends AbstractActionController
     public function transformAction()
     {
         $mapfile = $this->params()->fromRoute('mapfile');
+        $step = $this->params()->fromRoute('step');
         $data = include $mapfile;
 
         $map = new Map($data);
         $transformer = new Transformer($map);
-        $transformer->moveFiles();
+
+        switch ($step) {
+            case '3':
+                $transformer->modifyContentForUseStatements();
+                break;
+            case '2':
+                $transformer->modifyNamespaceAndClassNames();
+                break;
+            case '1':
+                $transformer->moveFiles();
+                break;
+            default:
+                $transformer->moveFiles();
+                $transformer->modifyNamespaceAndClassNames();
+                break;
+        }
+
+
     }
 }

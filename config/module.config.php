@@ -43,7 +43,7 @@ return array(
                 ),
                 'namespacer-transform' => array(
                     'options' => array(
-                        'route'    => 'transform [--mapfile=]',
+                        'route'    => 'transform [--mapfile=] [--step=]',
                         'defaults' => array(
                             'controller' => 'Namespacer\Controller\Controller',
                             'action'     => 'transform',
