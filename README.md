@@ -12,8 +12,7 @@ be done in place, so it is best to either do this in a separate copy of
 the code, or on top of a git repository where you can easily reset --hard
 if you need to.
 
-Use the phar, located in the repo at
-https://github.com/ralphschindler/Namespacer
+**Download**: https://github.com/ralphschindler/Namespacer/blob/master/namespacer.phar?raw=true
 
 * First, create a map file:
 
