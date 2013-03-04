@@ -28,17 +28,27 @@ class Mapper
         $file = realpath($file);
 
         $datas = array();
-
         $fs = new FileScanner($file);
-        $classes = $fs->getClassNames();
+        // problem in TokenArrayScanner.php line #579, needs fix (notice undefined offset 1)
+        @$classes = $fs->getClassNames();
         foreach ($classes as $class) {
 
             $newNamespace = str_replace('_', '\\', substr($class, 0, strrpos($class, '_')));
-            $newClass = substr($class, strrpos($class, '_')+1);
+            if (strpos($class, '_') !== false) {
+                $newClass = substr($class, strrpos($class, '_')+1);
+            } else {
+                $newClass = $class;
+            }
+
             $rootDir = $this->findRootDirectory($file, $class);
-            $newFile = $rootDir . DIRECTORY_SEPARATOR
-                . str_replace('\\', DIRECTORY_SEPARATOR, $newNamespace) . DIRECTORY_SEPARATOR
-                . $newClass . '.php';
+            if ($newNamespace) {
+                $newFile = $rootDir . DIRECTORY_SEPARATOR
+                    . str_replace('\\', DIRECTORY_SEPARATOR, $newNamespace) . DIRECTORY_SEPARATOR
+                    . $newClass . '.php';
+            } else {
+                $newFile = $file;
+            }
+
 
             //$root = substr($file, 0, strpos($file, str_replace('\\', DIRECTORY_SEPARATOR, $newNamespace)));
 
@@ -68,12 +78,14 @@ class Mapper
     {
         $rootDirParts = array_reverse(explode(DIRECTORY_SEPARATOR, $file));
         $classParts = array_reverse(explode('_', $class));
-        if (count($classParts) === 1) {
-            return implode(DIRECTORY_SEPARATOR, array_reverse($rootDirParts));
-        }
+
         // remove file/class
         array_shift($rootDirParts);
         array_shift($classParts);
+
+        if (count($classParts) === 0) {
+            return implode(DIRECTORY_SEPARATOR, array_reverse($rootDirParts));
+        }
 
         while (true) {
             $curDirPart = reset($rootDirParts);

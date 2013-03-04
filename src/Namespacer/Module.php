@@ -48,8 +48,8 @@ class Module implements ConsoleUsageProviderInterface, AutoloaderProviderInterfa
 
         return array(
             'Basic information:',
-            'create map <file>'       => 'create a map in file <file>',
-            'version | --version'         => 'display current Zend Framework version',
+            'map --mapfile <file> --source <sourcedir>' => 'create a map in file <file> from <source>',
+            'transform --mapfile <file>' => 'transform the files in the map',
         );
     }
 }

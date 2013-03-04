@@ -75,6 +75,10 @@ class Transformer
     {
         $tokens = token_get_all(file_get_contents($file));
 
+        if ($names['namespace'] == '') {
+            return;
+        }
+
         switch (true) {
             case ($tokens[0][0] === T_OPEN_TAG && $tokens[1][0] === T_DOC_COMMENT):
                 array_splice($tokens, 2, 0, "\n\nnamespace {$names['namespace']};\n");
@@ -107,6 +111,10 @@ class Transformer
         $normalTokens = array();
         $interestingTokens = array();
 
+        $hasNamespace = false;
+        $usePlacement = 1;
+        $currentClass = '';
+
         do {
             $normalTokens[] = ((is_array($token)) ? $token[0] : $token) . PHP_EOL;
         } while ($token = next($tokens));
@@ -114,23 +122,47 @@ class Transformer
         foreach ($normalTokens as $i => $t1) {
             $t2 = isset($normalTokens[$i+1]) ? $normalTokens[$i+1] : null;
             $t3 = isset($normalTokens[$i+2]) ? $normalTokens[$i+2] : null;
-            // $t4 = isset($normalTokens[$i+3]) ? $normalTokens[$i+3] : null;
 
-            // constant usage
-            if ($t1 == T_STRING && $t2 == T_DOUBLE_COLON && $t3 == T_STRING) {
-                $interestingTokens[] = $i;
+            // find if it has a namespace
+            if ($i < 3 && $t1 == T_OPEN_TAG) {
+                $usePlacement = $i + 1;
+                if ($t2 == T_DOC_COMMENT) {
+                    $usePlacement = $i + 2;
+                }
+            }
+
+            if ($t1 == T_NAMESPACE) {
+                $hasNamespace = true;
+                $usePlacement = $i + 1;
+            }
+
+            // find current class name (used for collions in uses)
+            if ($t1 == T_CLASS && $t2 == T_WHITESPACE && $t3 == T_STRING) {
+                $currentClass = $tokens[$i+2][1];
                 continue;
             }
 
+            // constant usage
+            if ($t1 == T_STRING && $t2 == T_DOUBLE_COLON && $t3 == T_STRING) {
+                if (!in_array($tokens[$i][1], array('self', 'parent'))) {
+                    $interestingTokens[] = $i;
+                    continue;
+                }
+            }
+
             // instanceof
-            if ($t1 == T_INSTANCEOF && $t2 == T_STRING && $t3 == ')') {
-                $interestingTokens[] = $i+1;
+            if ($t1 == T_INSTANCEOF && $t2 == T_WHITESPACE && $t3 == T_STRING) {
+                if (!in_array($tokens[$i+2][1], array('self', 'parent'))) {
+                    $interestingTokens[] = $i+2;
+                }
                 continue;
             }
 
             // new
             if ($t1 == T_NEW && $t2 == T_WHITESPACE && $t3 == T_STRING) {
-                $interestingTokens[] = $i+2;
+                if (!in_array($tokens[$i+2][1], array('self', 'parent'))) {
+                    $interestingTokens[] = $i+2;
+                }
                 continue;
             }
 
@@ -143,12 +175,20 @@ class Transformer
             // implements
             if ($t1 == T_IMPLEMENTS && $t2 == T_WHITESPACE && $t3 == T_STRING) {
                 $u = $i + 1;
-                while ($normalTokens[++$u] !== '{') {
+                do {
                     if ($normalTokens[$u] == T_STRING) {
                         $interestingTokens[] = $u;
+                    } elseif ($normalTokens[$u] == '{' || $normalTokens[$u] == "{\n") {
+                        continue 2;
                     }
-                }
+                    $u++;
+                } while (isset($normalTokens[$u]) && $normalTokens[$u] !== '{');
                 continue;
+            }
+
+            // type-hints
+            if ($t1 == T_STRING && $t2 == T_WHITESPACE && $t3 == T_VARIABLE) {
+                $interestingTokens[] = $i;
             }
         }
 
@@ -170,14 +210,14 @@ class Transformer
         }
 
         $shortNamesCount = array_count_values($shortNames);
-        $dupShortNames = array_filter($shortNames, function ($item) use ($shortNamesCount) { return ($shortNamesCount[$item] >= 2); });
-
+        $dupShortNames = array_filter($shortNames, function ($item) use ($shortNamesCount, $currentClass) { return (($shortNamesCount[$item] >= 2) || $item == $currentClass); });
 
         $useContent = '';
 
         foreach ($shortNames as $fqcn => $sn) {
             if (isset($dupShortNames[$fqcn])) {
                 $useContent .= "use $fqcn as " . str_replace('\\', '', $fqcn) . ";\n";
+                $shortNames[$fqcn] = str_replace('\\', '', $fqcn);
             } else {
                 $useContent .= "use $fqcn;\n";
             }
@@ -185,14 +225,18 @@ class Transformer
 
         $contents = '';
         $token = reset($tokens);
-        do {
 
-            if (is_array($token) && $token[0] == T_NAMESPACE) {
-                echo 'found namespace';
-                do {
+        do {
+            if (key($tokens) == $usePlacement) {
+                if ($hasNamespace) {
+                    do {
+                        $contents .= (is_array($token)) ? $token[1] : $token;
+                    } while (($token = next($tokens)) !== false && !(is_string($token) && $token == ';'));
+                    $contents .= ';';
+                } else {
                     $contents .= (is_array($token)) ? $token[1] : $token;
-                } while (($token = next($tokens)) !== false && !(is_string($token) && $token == ';'));
-                $contents .= ";\n\n$useContent";
+                }
+                $contents .= "\n\n$useContent\n";
             } elseif (array_search(key($tokens), $interestingTokens) !== false) {
                 $contents .= $shortNames[$uniqueUses[$token[1]]];
             } else {

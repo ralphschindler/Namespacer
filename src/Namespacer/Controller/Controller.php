@@ -45,6 +45,7 @@ class Controller extends AbstractActionController
             default:
                 $transformer->moveFiles();
                 $transformer->modifyNamespaceAndClassNames();
+                $transformer->modifyContentForUseStatements();
                 break;
         }
 
